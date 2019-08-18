@@ -1,0 +1,180 @@
+{% extends "base.html.twig" %}
+
+{% block body %}
+<div id="content">
+    <div id="gameBoard" class="p-5">
+        <div class="row pb-5">
+            <div class="pl-2">
+                <input id="newGame" type="button" class="btn btn-primary" value="New game" onclick="newGame()">
+            </div>
+            <div class="pl-2">
+                <select id="CPULevel">
+                    <option value="easy">Easy CPU</option>
+                    <option value="medium">Medium CPU</option>
+                    <option value="hard">Hard CPU</option>
+                </select>
+            </div>
+        </div>
+        <div id="status" class="row pb-1"></div>
+        <div class="row">
+            <input id="0" type="text" size="3" style="text-align: center;" onkeypress="checkInput(event)">
+            <input id="1" type="text" size="3" style="text-align: center;" onkeypress="checkInput(event)">
+            <input id="2" type="text" size="3" style="text-align: center;" onkeypress="checkInput(event)">
+        </div>
+        <div class="row">
+            <input id="3" type="text" size="3" style="text-align: center;" onkeypress="checkInput(event)">
+            <input id="4" type="text" size="3" style="text-align: center;" onkeypress="checkInput(event)">
+            <input id="5" type="text" size="3" style="text-align: center;" onkeypress="checkInput(event)">
+        </div>
+        <div class="row">
+            <input id="6" type="text" size="3" style="text-align: center;" onkeypress="checkInput(event)">
+            <input id="7" type="text" size="3" style="text-align: center;" onkeypress="checkInput(event)">
+            <input id="8" type="text" size="3" style="text-align: center;" onkeypress="checkInput(event)">
+        </div>
+        <div class="row pt-3">
+            <input id="submit" type="button" class="btn btn-primary" value="End move" onclick="submit()">
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block javascripts %}
+<script>
+function newGame() {
+    let level = document.getElementById("CPULevel").value;
+    document.getElementById('status').innerHTML = `New game started with <strong class="pl-1 pr-1">${level}<\/strong> opponent!`;
+    document.getElementById('submit').disabled = false;
+    let inputs = document.getElementById('gameBoard').getElementsByTagName('input');
+    for(input of inputs) {
+        if (input.type !== 'button') {
+            input.value = '';
+            input.disabled = false;
+        }
+    }
+    initBoard();
+}
+
+var oldBoard = [];
+function initBoard() {
+    oldBoard = [];
+    for (var i = 0; i < 9; i++) {
+        oldBoard.push({
+            id: i,
+            value: ''
+        });
+    }
+}
+
+function submit() {
+    document.getElementById('status').innerText = '';
+    document.getElementById('submit').disabled = true;
+    let data = [];
+    let inputs = document.getElementById('gameBoard').getElementsByTagName('input');
+    let noInput = true;
+    for(input of inputs) {
+        if (input.type !== 'button') {
+            data.push({
+                id: input.id,
+                value: input.value
+            });
+            if (input.value !== '') {
+                noInput = false;
+            }
+        }
+    };
+    // no move made
+    if (noInput || isEqual(oldBoard, data)) {
+        document.getElementById('status').innerText = 'Make a move!';
+        document.getElementById('submit').disabled = false;
+        return;
+    }
+    // too many x added
+    if (getDiff(data, oldBoard) > 1) {
+        document.getElementById('status').innerText = 'Too many Xs!';
+        document.getElementById('submit').disabled = false;
+        return;
+    }
+
+    let level = document.getElementById("CPULevel").value;
+    fetch('move', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({board: data, level}),
+    })
+    .then(response => response.json())
+    .then(data => {
+        let winner = data.winner;
+        let board = oldBoard = data.board;
+        if (winner === 'x') {
+            document.getElementById('status').innerText = 'You won!';
+        } else if(winner === 'o') {
+            document.getElementById('status').innerText = 'You lost!';
+        } else if(winner === 'draw') {
+            document.getElementById('status').innerText = 'A draw!';
+        } else {
+            document.getElementById('submit').disabled = false;
+        }
+        for (input of inputs) {
+            if (input.type !== 'button') {
+                input.value = board[Number(input.id)].value;
+                if (winner !== '' || input.value !== '') {
+                    input.disabled = true;
+                }
+            }
+        }
+    });
+}
+
+function getDiff(arrayA, arrayB) {
+    let count = 0;
+
+    for (var i = 0; i < arrayA.length; i++) {
+        if (arrayA[i].value !== arrayB[i].value) {
+            count++;
+        }
+    }
+
+    return count;
+}
+
+function isEqual(arrayA, arrayB) {
+    if (arrayA === arrayB) return true;
+    if (arrayA == null || arrayB == null) return false;
+    if (arrayA.length != arrayB.length) return false;
+
+    for (var i = 0; i < arrayA.length; i++) {
+        if (arrayA[i].value !== arrayB[i].value) return false;
+    }
+
+    return true;
+}
+
+function checkInput(event) {
+    event.preventDefault();
+    //firefox hack: firefox has event.target others event.srcElement
+    let target = (event.srcElement||event.target);
+    if (target.value !== '') {
+        // firefox hack: backspace and delete keys
+        if (event.keyCode === 8 || event.keyCode === 46) {
+            return target.value = '';
+        }
+        return;
+    }
+
+    let key = event.key.toLowerCase();
+    if (key !== 'x') {
+        document.getElementById("status").innerText = 'Only X allowed!';
+        return;
+    }
+    if (document.getElementById("status").innerText) {
+        document.getElementById("status").innerText = '';
+    }
+
+    target.value = 'x';
+}
+
+newGame();
+</script>
+{% endblock %}
